@@ -1,0 +1,91 @@
+// 指定 proto 版本
+syntax = "proto3";
+
+// 指定包名
+package grpc_proto_log;
+option go_package = "./;grpc_proto_log";
+
+// 定义 log 服务
+service Log {
+  // 定义 Write 方法
+  rpc DbLogWrite(DbLogRequest) returns (DbLogResponse) {}
+  // 定义 Write 方法
+  rpc AppLogWrite(AppLogRequest) returns (AppLogResponse) {}
+  // 定义 Write 方法
+  rpc JsonLogWrite(JsonLogRequest) returns (JsonLogResponse) {}
+}
+
+//  --- DbLog --- ///////////////////////////////////////////////////
+
+// 结构1：引用日志数据格式
+message DbLogData {
+  string dbInstance = 1;        // "anoah",
+  string type       = 2;        // table-create / update / insert
+  string database   = 3;        // $db,
+  string table      = 4;        // $tb,
+  string ts         = 5;        // time(),
+  string position   = 6;        // "xxx",
+  int64  xid        = 7;        // 1, (update / insert 时有值)
+  bool   commit     = 8;        // true, (update / insert 时有值)
+  map<string, string> data = 9; // (update / insert 时有值)
+  string sql        = 10;       // "CREATE TABLE `$tb` ( // CREATE TABLE …… (table-create 的时候有值)
+}
+
+// 结构2：请求数据格式
+message DbLogRequest {
+  int32 DataType = 1;          // 数据类型
+  bytes Data=2;       // 内容数据
+}
+
+// 结构3：返回数据格式
+message DbLogResponse {
+  int32 errCode = 1;
+  string errMessage = 2;
+  string data = 3;
+}
+
+//  --- AppLog --- ///////////////////////////////////////////////////
+
+// 结构1：引用日志数据格式
+message AppLogData {
+  string Env = 1;       // 环境 dev/prod/test/k8s等
+  string Sys = 2;       // 系统 yxb/zuoye等
+  string Level = 3;     // 级别: error/warning/info等
+  string File = 4;      // 程序文件地址
+  string Func = 5;      // 程序函数
+  string Time = 6;      // 发生时间 "2022-01-01 12:12:12"
+  int64  TimeInt64 = 7; // 发生时间时间戳纳秒
+  string Message =8;    // 日志内容
+  map<string, string> Data = 9; // map格式更多数据
+}
+
+// 结构2：请求数据格式
+message AppLogRequest {
+  int32 DataType = 1;          // 数据类型
+  bytes Data=2;       // 内容数据
+}
+
+// 结构3：返回数据格式
+message AppLogResponse {
+  int32 errCode = 1;
+  string errMessage = 2;
+  string data = 3;
+}
+
+//  --- JsonLog --- ///////////////////////////////////////////////////
+
+// 结构2：请求数据格式
+message JsonLogRequest {
+  int32 DataType = 1;          // 数据类型
+  bytes Data=2;       // 内容数据
+}
+
+// 结构3：返回数据格式
+message JsonLogResponse {
+  int32 errCode = 1;
+  string errMessage = 2;
+  string data = 3;
+}
+
+
+// 生成go语言命令    protoc --go_out=plugins=grpc:. *.proto
