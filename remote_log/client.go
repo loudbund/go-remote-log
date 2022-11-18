@@ -13,19 +13,34 @@ import (
 )
 
 type Client struct {
-	logFolder string // 日志文件目录
+	// 日志文件目录
+	logFolder string
 
-	ReqDate   string // 请求日志的日期
-	ReqDateId int64  // 请求日志的位置
+	// ReqDate:		请求日志的日期
+	// ReqDateId:	请求日志的位置
+	ReqDate   string
+	ReqDateId int64
 
-	logHandles          map[string]*filelog_v1.CFileLog // 日志处理实例map，键值为日期
-	initHistoryDayNum   int                             // 启动时同步前几天日志数据的天数，0,当天，-1，昨天……；默认为0
-	retainHistoryDayNum int                             // 日志保留到的天数,(a:日志至少保留1天及最大为-1；b:必须小于等于initHistoryDayNum) ，-1，昨天，-2，前天……；默认为-1
+	// 日志处理实例map，键值为日期
+	logHandles map[string]*filelog_v1.CFileLog
+
+	// 启动时同步前几天日志数据的天数，0,当天，-1，昨天……；默认为0
+	initHistoryDayNum int
+
+	// 日志保留到的天数,
+	// (a:日志至少保留1天及最大为-1；b:必须小于等于initHistoryDayNum) ，
+	// 	-1，昨天，-2，前天……；默认为-1
+	retainHistoryDayNum int
 }
-type ClientOptions struct { // NewClient的更多参数项
-	InitHistoryDayNum   int // 参见 Client.initHistoryDayNum 的说明
-	RetainHistoryDayNum int // 参见 Client.retainHistoryDayNum 的说明
-	SendFlag            int // socket的传输码
+
+// NewClient的更多参数项
+type ClientOptions struct {
+	// 参见 Client.initHistoryDayNum 的说明
+	InitHistoryDayNum int
+	// 参见 Client.retainHistoryDayNum 的说明
+	RetainHistoryDayNum int
+	// socket的传输码
+	SendFlag int
 }
 
 // 对外函数：创建实例

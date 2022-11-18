@@ -9,6 +9,7 @@ import (
 	"github.com/loudbund/go-socket2/socket2"
 	"github.com/loudbund/go-utils/utils_v1"
 	log "github.com/sirupsen/logrus"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,38 +35,68 @@ type Server struct {
 	Users        map[string]*User // 客户端clientid和User的map关系
 	lockListUser sync.RWMutex     // 客户端链表同步锁
 
-	date       string                          // 当前存入日志的日期
-	logFolder  string                          // 日志文件目录
-	logChan    chan *filelog_v1.UDataSend      // 并发转线性处理通道
-	logHandles map[string]*filelog_v1.CFileLog // 日志处理实例map，键值为日期
+	// 当前存入日志的日期
+	date string
+
+	// 日志文件目录
+	logFolder string
+
+	// 并发转线性处理通道
+	logChan chan *filelog_v1.UDataSend
+
+	// 日志处理实例map，键值为日期
+	logHandles map[string]*filelog_v1.CFileLog
+
+	// 日志保留到的天数,
+	// 日志至少保留7天及最大为-7； -7，保留7天，-8，保留8天……
+	retainHistoryDayNum int
+}
+
+type ParamNewServer struct {
+	Ip                  string // 绑定ip
+	PortSocket          int    // 数据同步用socket端口
+	PortGRpc            int    // 数据接收的grpc端口
+	LogFolder           string // 日志文件夹
+	RetainHistoryDayNum int    // 日志保留天数
+	SendFlag            int    // socket验证标记
 }
 
 // 对外函数：创建实例
-func NewServer(Ip string, PortSocket, PortGRpc int, logFolder string) *Server {
+func NewServer(Param ParamNewServer) *Server {
 	Me := &Server{
 		Users:      map[string]*User{},
 		ListUser:   list.New(),
 		date:       utils_v1.Time().Date(),
-		logFolder:  logFolder,
+		logFolder:  Param.LogFolder,
 		logChan:    make(chan *filelog_v1.UDataSend),
 		logHandles: map[string]*filelog_v1.CFileLog{},
 	}
+	// -1- 参数校正
+	if Param.RetainHistoryDayNum > -8 {
+		Me.retainHistoryDayNum = -8
+		fmt.Println("Warning! retainHistoryDayNum is big than -8,will use -8")
+	} else {
+		Me.retainHistoryDayNum = Param.RetainHistoryDayNum
+	}
 
-	// 1、关闭前几天的日志
+	// -2- 关闭前几天的日志
 	Me.closePreDateLog()
 
-	// 2、写日志协程
+	// -3- 写日志协程
 	go Me.messageWrite()
 
-	// 3、socket服务器
-	Me.SocketServer = socket2.NewServer(Ip, PortSocket, func(Event socket2.HookEvent) {
+	// -4- socket服务器
+	Me.SocketServer = socket2.NewServer(Param.Ip, Param.PortSocket, func(Event socket2.HookEvent) {
 		Me.onHookEvent(Event)
 	})
 
-	// 4、grpc服务，
-	if PortGRpc > 0 {
-		go NewLog(Ip+":"+strconv.Itoa(PortGRpc), Me)
+	// -5- grpc服务，
+	if Param.PortGRpc > 0 {
+		go NewLog(Param.Ip+":"+strconv.Itoa(Param.PortGRpc), Me)
 	}
+
+	// -6- 校验码设置
+	Me.SocketServer.Set("SendFlag", Param.SendFlag)
 
 	return Me
 }
@@ -103,6 +134,9 @@ func (Me *Server) closePreDateLog() {
 		// 日期加1天
 		iDate = utils_v1.Time().DateAdd(iDate, 1)
 	}
+
+	// 执行一次日志清理
+	Me.logDelete()
 }
 
 // 管道接收日志并写文件
@@ -153,6 +187,9 @@ func (Me *Server) messageWrite() {
 						delete(Me.logHandles, Me.date)
 					}
 					Me.date = Date
+
+					// 执行一次日志清理
+					Me.logDelete()
 				}
 			}
 
@@ -176,7 +213,6 @@ func (Me *Server) messageWrite() {
 func (Me *Server) onHookEvent(Event socket2.HookEvent) {
 	switch Event.EventType {
 	case "message": // 1、消息事件
-		fmt.Println("message:", utils_v1.Time().DateTime(), Event.Message.CType, string(Event.Message.Content))
 		// 客户端请求日期和开始位置日志
 		if Event.Message.CType == 301 {
 			if jData, err := json_v1.JsonDecode(string(Event.Message.Content)); err != nil {
@@ -325,4 +361,20 @@ func (Me *Server) removeUser(ClientId string) {
 		}
 	}
 	Me.lockListUser.Unlock()
+}
+
+// 3、日志清理
+func (Me *Server) logDelete() {
+	// 开始保留日志的日期
+	retainDate := utils_v1.Time().DateAdd(utils_v1.Time().Date(), Me.retainHistoryDayNum)
+
+	// 从需要保留的日期，向前删除30天的数据
+	Start := utils_v1.Time().DateAdd(retainDate, -30)
+	for D := Start; D < retainDate; D = utils_v1.Time().DateAdd(D, 1) {
+		Folder := Me.logFolder + "/" + strings.ReplaceAll(D, "-", "")
+		if utils_v1.File().CheckFileExist(Folder) {
+			log.Info("清理日志 " + Folder)
+			_ = os.RemoveAll(Folder)
+		}
+	}
 }
