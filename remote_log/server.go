@@ -52,6 +52,7 @@ type Server struct {
 	retainHistoryDayNum int
 }
 
+// NewServer的参数结构
 type ParamNewServer struct {
 	Ip                  string // 绑定ip
 	PortSocket          int    // 数据同步用socket端口

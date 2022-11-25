@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// 客户端结构体
 type Client struct {
 	// 日志文件目录
 	logFolder string
@@ -33,45 +34,41 @@ type Client struct {
 	retainHistoryDayNum int
 }
 
-// NewClient的更多参数项
-type ClientOptions struct {
-	// 参见 Client.initHistoryDayNum 的说明
-	InitHistoryDayNum int
-	// 参见 Client.retainHistoryDayNum 的说明
-	RetainHistoryDayNum int
-	// socket的传输码
-	SendFlag int
+// NewServer的参数结构
+type ParamNewClient struct {
+	ServerIp            string // 绑定ip
+	ServerPort          int    // 数据同步用socket端口
+	LogFolder           string // 日志文件夹
+	InitHistoryDayNum   int    // 参见 Client.initHistoryDayNum 的说明
+	RetainHistoryDayNum int    // 参见 Client.retainHistoryDayNum 的说明
+	SendFlag            int    // socket验证标记
 }
 
 // 对外函数：创建实例
-func NewClient(serverIp string, serverPort int, logFolder string, opt ...ClientOptions) *Client {
+func NewClient(Param ParamNewClient) *Client {
 	// 1、实例化客户端
 	Me := &Client{
-		logFolder:           logFolder,
+		logFolder:           Param.LogFolder,
 		logHandles:          map[string]*filelog_v1.CFileLog{},
-		initHistoryDayNum:   0,
-		retainHistoryDayNum: -1,
+		initHistoryDayNum:   Param.InitHistoryDayNum,
+		retainHistoryDayNum: Param.RetainHistoryDayNum,
 	}
 	// 同步历史数据天数设置 和 日志保留天数设置
-	if len(opt) > 0 {
-		Me.initHistoryDayNum = opt[0].InitHistoryDayNum
-		Me.retainHistoryDayNum = opt[0].RetainHistoryDayNum
-		if Me.initHistoryDayNum > 0 { // 不能大于0
-			Me.initHistoryDayNum = 0
-		}
-		if Me.retainHistoryDayNum > -1 { // 不能大于-1
-			Me.retainHistoryDayNum = -1
-		}
-		if Me.retainHistoryDayNum > Me.initHistoryDayNum { // 不能大于initHistoryDayNum
-			Me.retainHistoryDayNum = Me.initHistoryDayNum
-		}
+	if Me.initHistoryDayNum > 0 { // 不能大于0
+		Me.initHistoryDayNum = 0
+	}
+	if Me.retainHistoryDayNum > -1 { // 不能大于-1
+		Me.retainHistoryDayNum = -1
+	}
+	if Me.retainHistoryDayNum > Me.initHistoryDayNum { // 不能大于initHistoryDayNum
+		Me.retainHistoryDayNum = Me.initHistoryDayNum
 	}
 
 	// 2、创建客户端socket连接
-	SocketClient := socket2.NewClient(serverIp, serverPort, Me.onMessage, Me.onConnectFail, Me.onConnect, Me.onDisConnect)
+	SocketClient := socket2.NewClient(Param.ServerIp, Param.ServerPort, Me.onMessage, Me.onConnectFail, Me.onConnect, Me.onDisConnect)
 	// socket传输码设置
-	if len(opt) > 0 && opt[0].SendFlag > 0 {
-		SocketClient.Set("SendFlag", opt[0].SendFlag)
+	if Param.SendFlag > 0 {
+		SocketClient.Set("SendFlag", Param.SendFlag)
 	}
 
 	go SocketClient.Connect()

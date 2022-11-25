@@ -11,16 +11,14 @@ import (
 func main() {
 	// 1、创建客户端连接
 	// 日志服务的ip为127.0.0.1；端口号为2222；日志同步到目录"/tmp/test-modsynlog-client"
-	_ = remote_log.NewClient(
-		"127.0.0.1",
-		2222,
-		"/tmp/test-modsynlog-client",
-		remote_log.ClientOptions{ // 省略掉该参数，InitHistoryDayNum为0，即只补充同步当天日志
-			InitHistoryDayNum:   -1,     // 补充同步昨天的日志
-			SendFlag:            123456, // 传输码
-			RetainHistoryDayNum: -3,     // 日志保留3天
-		},
-	)
+	_ = remote_log.NewClient(remote_log.ParamNewClient{
+		ServerIp:            "127.0.0.1",                  // socketIp
+		ServerPort:          2222,                         // socket端口
+		LogFolder:           "/tmp/test-modsynlog-client", // 日志目录
+		InitHistoryDayNum:   -1,                           // 补充同步昨天的日志
+		RetainHistoryDayNum: -3,                           // 日志保留3天
+		SendFlag:            123456,                       // 传输码
+	})
 
 	// 2、模拟消费日志数据
 	logHandle := filelog_v1.New("/tmp/test-modsynlog-client", time.Now().Format("2006-01-02"))
